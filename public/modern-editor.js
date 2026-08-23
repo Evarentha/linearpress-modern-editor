@@ -169,14 +169,92 @@
   page.querySelector('[data-add-paragraph]').addEventListener('click', () => add('paragraph'));
   title.addEventListener('input', () => { page.querySelector('[data-summary-title]').textContent = title.value || '未命名文章'; markDirty(); });
 
-  const formatBar = document.createElement('div'); formatBar.className = 'modern-format-bar'; formatBar.setAttribute('role', 'toolbar'); formatBar.innerHTML = '<button type="button" data-cmd="bold"><b>B</b></button><button type="button" data-cmd="italic"><i>I</i></button><button type="button" data-cmd="underline"><u>U</u></button><button type="button" data-cmd="strikeThrough"><s>S</s></button><button type="button" data-cmd="underlineWave">〰</button><label title="文字颜色">A<input type="color" data-color="foreColor" value="#17201c"></label><label title="背景颜色">▰<input type="color" data-color="backColor" value="#fff2a8"></label>';
+  const formatBar = document.createElement('div'); formatBar.className = 'modern-format-bar'; formatBar.setAttribute('role', 'toolbar'); formatBar.innerHTML = '<button type="button" data-cmd="bold" title="加粗"><b>B</b></button><button type="button" data-cmd="italic" title="斜体"><i>I</i></button><button type="button" data-cmd="underline" title="下划线"><u>U</u></button><button type="button" data-cmd="underlineWave" title="波浪线">〰</button><button type="button" data-cmd="strikeThrough" title="删除线"><s>S</s></button><button type="button" data-cmd="fontSmaller" title="字体变小">A−</button><button type="button" data-cmd="fontLarger" title="字体变大">A+</button><label title="文字颜色">A<input type="color" data-color="foreColor" value="#17201c"></label><label title="背景颜色">▰<input type="color" data-color="backColor" value="#fff2a8"></label>';
   document.body.append(formatBar);
   function editableSelection() { const selection = window.getSelection(); return selection?.rangeCount && selection.anchorNode && page.contains(selection.anchorNode) ? selection : null; }
-  document.addEventListener('selectionchange', () => { const selection = editableSelection(); const parent = selection?.anchorNode?.parentElement?.closest('.modern-rich-editable'); if (!selection || selection.isCollapsed || !parent) { formatBar.classList.remove('is-visible'); return; } savedSelection = selection.getRangeAt(0).cloneRange(); savedEditor = parent; const rect = savedSelection.getBoundingClientRect(); formatBar.style.left = `${Math.max(8, rect.left + rect.width / 2 - 145)}px`; formatBar.style.top = `${Math.max(8, rect.top - 48)}px`; formatBar.classList.add('is-visible'); });
-  formatBar.addEventListener('mousedown', (event) => { if (event.target.tagName === 'BUTTON') event.preventDefault(); });
-  function normalizeInlineMarkup(root) { root.querySelectorAll('font[color],font[style]').forEach((font) => { const span = document.createElement('span'); if (font.getAttribute('color')) span.style.color = font.getAttribute('color'); if (font.getAttribute('style')) span.setAttribute('style', font.getAttribute('style')); span.innerHTML = font.innerHTML; font.replaceWith(span); }); }
+  function positionFormatBar() {
+    if (!savedSelection) return;
+    const rect = savedSelection.getBoundingClientRect();
+    const width = formatBar.offsetWidth;
+    const height = formatBar.offsetHeight;
+    const left = Math.max(8, Math.min(window.innerWidth - width - 8, rect.left + (rect.width / 2) - (width / 2)));
+    let top = rect.top - height - 10;
+    if (top < 8) top = rect.bottom + 10;
+    if (top + height > window.innerHeight - 8) top = Math.max(8, window.innerHeight - height - 8);
+    formatBar.style.left = `${left}px`;
+    formatBar.style.top = `${top}px`;
+  }
+  document.addEventListener('selectionchange', () => {
+    const selection = editableSelection();
+    const parent = selection?.anchorNode?.parentElement?.closest('.modern-rich-editable');
+    const toolbarFocused = formatBar.contains(document.activeElement);
+    if (!selection || selection.isCollapsed || !parent) { if (!toolbarFocused) formatBar.classList.remove('is-visible'); return; }
+    savedSelection = selection.getRangeAt(0).cloneRange();
+    savedEditor = parent;
+    formatBar.classList.add('is-visible');
+    requestAnimationFrame(positionFormatBar);
+  });
+  window.addEventListener('resize', positionFormatBar);
+  window.addEventListener('scroll', positionFormatBar, true);
+  formatBar.addEventListener('mousedown', (event) => { if (event.target instanceof Element && event.target.closest('button')) event.preventDefault(); });
+  function normalizeInlineMarkup(root) {
+    const sizeMap = { '1': '10px', '2': '12px', '3': '14px', '4': '16px', '5': '18px', '6': '24px', '7': '32px' };
+    root.querySelectorAll('font[color],font[size],font[style]').forEach((font) => {
+      const span = document.createElement('span');
+      if (font.getAttribute('color')) span.style.color = font.getAttribute('color');
+      if (font.getAttribute('size')) span.style.fontSize = sizeMap[font.getAttribute('size')] || '16px';
+      if (font.getAttribute('style')) span.setAttribute('style', font.getAttribute('style'));
+      span.innerHTML = font.innerHTML;
+      font.replaceWith(span);
+    });
+  }
   function applyWave() { if (!savedSelection) return; const span = document.createElement('span'); span.style.textDecorationLine = 'underline'; span.style.textDecorationStyle = 'wavy'; span.append(savedSelection.extractContents()); savedSelection.insertNode(span); }
-  function applyFormat(command, value) { if (!savedSelection || !savedEditor) return; const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(savedSelection); if (command === 'underlineWave') applyWave(); else if (command === 'backColor' && !document.execCommand(command, false, value)) document.execCommand('hiliteColor', false, value); else document.execCommand(command, false, value); normalizeInlineMarkup(savedEditor); savedEditor.dispatchEvent(new Event('input', { bubbles: true })); markDirty(); }
+  function applyRelativeFontSize(delta) {
+    if (!savedSelection || !savedEditor) return;
+    const start = savedSelection.startContainer.nodeType === Node.ELEMENT_NODE ? savedSelection.startContainer : savedSelection.startContainer.parentElement;
+    const current = start ? parseFloat(getComputedStyle(start).fontSize) || 16 : 16;
+    const next = Math.max(10, Math.min(48, current + delta));
+    const startCell = savedSelection.startContainer.parentElement?.closest('td,th');
+    const endCell = savedSelection.endContainer.parentElement?.closest('td,th');
+    // A table selection can cross cell boundaries; let the browser split those text nodes.
+    if (savedEditor.matches('table') && startCell && endCell && startCell !== endCell) {
+      const sizes = [10, 12, 14, 16, 18, 24, 32];
+      const targetIndex = sizes.findIndex((size) => size >= next);
+      const commandIndex = targetIndex === -1 ? sizes.length : targetIndex + 1;
+      const selection = window.getSelection();
+      selection.removeAllRanges(); selection.addRange(savedSelection);
+      document.execCommand('fontSize', false, String(commandIndex));
+      normalizeInlineMarkup(savedEditor);
+      return;
+    }
+    const fragment = savedSelection.extractContents();
+    fragment.querySelectorAll('[style]').forEach((element) => element.style.removeProperty('font-size'));
+    fragment.querySelectorAll('font[size]').forEach((element) => element.removeAttribute('size'));
+    const span = document.createElement('span');
+    span.style.fontSize = `${next}px`;
+    span.append(fragment);
+    savedSelection.insertNode(span);
+    const selection = window.getSelection();
+    const nextRange = document.createRange();
+    nextRange.selectNodeContents(span);
+    selection.removeAllRanges(); selection.addRange(nextRange);
+    savedSelection = nextRange.cloneRange();
+  }
+  function applyFormat(command, value) {
+    if (!savedSelection || !savedEditor) return;
+    const selection = window.getSelection();
+    selection.removeAllRanges(); selection.addRange(savedSelection);
+    if (command === 'fontSmaller') applyRelativeFontSize(-2);
+    else if (command === 'fontLarger') applyRelativeFontSize(2);
+    else if (command === 'underlineWave') applyWave();
+    else if (command === 'backColor' && !document.execCommand(command, false, value)) document.execCommand('hiliteColor', false, value);
+    else document.execCommand(command, false, value);
+    normalizeInlineMarkup(savedEditor);
+    savedEditor.dispatchEvent(new Event('input', { bubbles: true }));
+    markDirty();
+    formatBar.classList.add('is-visible');
+    requestAnimationFrame(positionFormatBar);
+  }
   formatBar.querySelectorAll('[data-cmd]').forEach((button) => button.addEventListener('click', () => applyFormat(button.dataset.cmd)));
   formatBar.querySelectorAll('[data-color]').forEach((input) => input.addEventListener('input', () => applyFormat(input.dataset.color, input.value)));
 

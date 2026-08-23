@@ -21,7 +21,7 @@ function readMarker(value: unknown): Record<string, unknown> | undefined {
 }
 
 const allowedTags = new Set(['STRONG', 'B', 'EM', 'I', 'U', 'S', 'DEL', 'SPAN', 'BR', 'CODE', 'MARK', 'FONT']);
-const allowedStyles = new Set(['color', 'background-color', 'text-decoration-line', 'text-decoration-style', 'font-weight', 'font-style']);
+const allowedStyles = new Set(['color', 'background-color', 'font-size', 'text-decoration-line', 'text-decoration-style', 'font-weight', 'font-style']);
 function safeText(value: unknown): string {
   return String(value ?? '')
     .replace(/&(?!(?:amp|lt|gt|quot|apos|#0?39|#x27|#\d+|#x[\da-f]+);)/gi, '&amp;')
