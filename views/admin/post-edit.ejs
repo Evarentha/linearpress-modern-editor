@@ -1,0 +1,26 @@
+<div class="modern-editor-page" data-modern-editor data-cloud-saved-at="<%= post?.updated_at ? Date.parse(post.updated_at) : 0 %>">
+  <form id="modern-editor-form" method="post" action="/admin/posts/save">
+    <input type="hidden" name="id" value="<%= post?.id ?? '' %>">
+    <input type="hidden" name="content_json" id="modern-content-json">
+    <header class="modern-topbar">
+      <div><a class="modern-back" href="/admin/posts" aria-label="返回文章列表">←</a><span class="modern-status" data-save-status>未保存</span></div>
+      <div class="modern-actions"><button type="button" class="modern-icon-button" data-save-draft title="保存草稿" aria-label="保存草稿">↥</button><button type="button" class="modern-publish-button" data-open-publish>发布</button></div>
+    </header>
+    <main class="modern-canvas">
+      <input class="modern-title" id="post-title" name="title" required value="<%= post?.title ?? '' %>" placeholder="未命名文章" autocomplete="off">
+      <div class="modern-slug-row"><span>/post/</span><input id="post-slug" name="slug" value="<%= post?.slug ?? '' %>" data-existing="<%= post ? 'true' : 'false' %>" placeholder="固定链接标识"><span id="slug-preview"></span></div>
+      <div class="modern-editor-toolbar" role="toolbar" aria-label="插入区块"><span class="modern-toolbar-label">插入</span><div data-block-toolbar></div></div>
+      <section class="modern-document" data-document aria-label="文章内容"></section>
+      <button class="modern-add-block" type="button" data-add-paragraph>在这里开始写作 <span>+</span></button>
+    </main>
+    <aside class="modern-publish-drawer" data-publish-drawer aria-hidden="true">
+      <div class="modern-drawer-head"><div><span class="modern-kicker">发布检查</span><h2>准备好了吗？</h2></div><button type="button" data-close-publish aria-label="关闭">×</button></div>
+      <div class="modern-summary"><span class="modern-summary-label">文章标题</span><strong data-summary-title>未命名文章</strong><span class="modern-summary-label">当前状态</span><strong data-summary-status>草稿</strong><span class="modern-summary-label">定时发布</span><label class="modern-schedule"><input type="checkbox" name="schedule_enabled" data-schedule-enabled <%= typeof schedule !== 'undefined' && schedule?.publish_at ? 'checked' : '' %>><span class="modern-checkmark">✓</span><span>启用定时发布</span></label><input type="datetime-local" name="publish_at" data-schedule-time value="<%= typeof schedule !== 'undefined' && schedule?.publish_at ? schedule.publish_at : '' %>" <%= typeof schedule !== 'undefined' && schedule?.publish_at ? '' : 'disabled' %>></div>
+      <p class="modern-drawer-note">封面图片由支持现代编辑器的主题从文章区块中自动识别。当前发布操作会将文章设为公开可见。</p>
+      <button type="button" class="modern-confirm-publish" data-confirm-publish>确认发布</button>
+    </aside>
+    <div class="modern-drawer-backdrop" data-close-publish></div>
+    <select name="status" data-status hidden><option value="draft" <%= post?.status === 'draft' || !post ? 'selected' : '' %>>草稿</option><option value="published" <%= post?.status === 'published' ? 'selected' : '' %>>发布</option><option value="archived" <%= post?.status === 'archived' ? 'selected' : '' %>>归档</option></select>
+  </form>
+</div>
+<script>window.MODERN_EDITOR_INITIAL = <%- JSON.stringify(post?.content_json ?? []) %>;</script>

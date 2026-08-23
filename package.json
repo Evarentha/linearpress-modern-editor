@@ -1,0 +1,7 @@
+{
+  "name": "linearpress-modern-editor",
+  "private": true,
+  "type": "module",
+  "dependencies": { "express": "^5.1.0" },
+  "devDependencies": { "@types/express": "^5.0.3", "typescript": "^5.8.3" }
+}
