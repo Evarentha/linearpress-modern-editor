@@ -1,3 +1,10 @@
+/*
+ * Author: MoyuZJ
+ * Team: LinearTeam
+ * Contact: linearteam@foxmail.com
+ * Made by MoyuZJ in China with ♥
+ */
+
 (() => {
   const page = document.querySelector('[data-modern-editor]');
   if (!page) return;

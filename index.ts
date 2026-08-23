@@ -1,3 +1,10 @@
+/*
+ * Author: MoyuZJ
+ * Team: LinearTeam
+ * Contact: linearteam@foxmail.com
+ * Made by MoyuZJ in China with ♥
+ */
+
 import type { RequestHandler } from 'express';
 import { checkPermission, requireAuth } from '../../services/permission.service.js';
 import { renderBlocks } from '../../core/block-registry.js';
