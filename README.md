@@ -2,7 +2,8 @@
 
 LinearPress 的 WordPress 风格可视化编辑器插件。
 
-## 安装
+LinearPress 当前通过 Cordis Fiber 管理插件生命周期，同时由 Express 提供路由和 EJS。编辑器的 `activate`、`deactivate` 仍兼容旧 API；定时发布计时器使用 `context.cordis.effect()` 自动清理。
+
 
 将本目录复制到 LinearPress 的 `src/plugins/modern-editor`，或在后台使用 ZIP 安装。插件启用后重启进程，管理后台的 `/admin/posts/new` 和 `/admin/posts/:id/edit` 会切换为现代编辑器。
 
@@ -21,7 +22,7 @@ LP-MODERN-BLOCK::<base64(JSON)>
 
 段落、标题、列表、引用、代码、详细信息、数学、预格式文本、引文、表格、诗、折叠内容、音频、视频、图标、单个或多个按钮、栏目和空间隔。栏目参考 WordPress `InnerBlocks` 模型，区块类型不会常驻显示在正文画布中。
 
-区块最终仍通过 LinearPress 的 Hook 和服务/区块注册体系参与渲染。其他插件可以继续使用 `post:beforeSave`、`post:beforeRender` 或编辑器端的 `window.LinearPressEditor` 扩展能力；现代编辑器不会替换 `TOKENS.posts`。
+区块最终仍通过 LinearPress 的 Hook 和服务/区块注册体系参与渲染。其他插件可以继续使用 `post:beforeSave`、`post:beforeRender` 或编辑器端的 `window.LinearPressEditor` 扩展能力；现代编辑器不会替换 `ctx.posts`。
 
 ## 草稿与发布
 

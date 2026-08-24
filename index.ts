@@ -6,14 +6,13 @@
  */
 
 import type { RequestHandler } from 'express';
+import { Context } from 'cordis';
 import { checkPermission, requireAuth } from '../../services/permission.service.js';
 import { renderBlocks } from '../../core/block-registry.js';
-import { TOKENS } from '../../core/tokens.js';
-import type { PluginEntry } from '../../types/plugin.js';
 import type { Block, Post, PostStatus } from '../../types/index.js';
 
+
 const MARKER = 'LP-MODERN-BLOCK::';
-let scheduleTimer: ReturnType<typeof setInterval> | undefined;
 const editPermission: RequestHandler = requireAuth;
 const canEdit: RequestHandler = checkPermission('post:edit');
 
@@ -107,36 +106,40 @@ function renderModern(block: Record<string, unknown>): string | undefined {
 function renderModernContent(blocks: Block[]): string { return blocks.map((block) => renderStored(block as unknown as Record<string, unknown>)).join('\n'); }
 function modernHtml(post: Post): string { return renderModernContent(post.content_json); }
 
-export const activate: PluginEntry['activate'] = async ({ router, container, hooks, logger }) => {
-  const posts = () => container.resolve(TOKENS.posts);
-  const database = () => container.resolve(TOKENS.databaseService);
-  await database().exec('CREATE TABLE IF NOT EXISTS modern_editor_schedule (post_id INTEGER PRIMARY KEY, publish_at TEXT NOT NULL)');
+export default async function modernEditor(context: Context) {
+  const { web } = context.linearpress;
+  const db = context.databaseService;
+  const posts = context.posts;
+
+  await db.exec('CREATE TABLE IF NOT EXISTS modern_editor_schedule (post_id INTEGER PRIMARY KEY, publish_at TEXT NOT NULL)');
   const publishDue = async () => {
-    const due = await database().all<{ post_id: number; publish_at: string }>('SELECT post_id, publish_at FROM modern_editor_schedule');
-    for (const item of due) if (Date.parse(item.publish_at) <= Date.now()) { await database().run("UPDATE posts SET status='published', updated_at=CURRENT_TIMESTAMP WHERE id=?", item.post_id); await database().run('DELETE FROM modern_editor_schedule WHERE post_id=?', item.post_id); }
+    const due = await db.all<{ post_id: number; publish_at: string }>('SELECT post_id, publish_at FROM modern_editor_schedule');
+    for (const item of due) if (Date.parse(item.publish_at) <= Date.now()) { await db.run("UPDATE posts SET status='published', updated_at=CURRENT_TIMESTAMP WHERE id=?", item.post_id); await db.run('DELETE FROM modern_editor_schedule WHERE post_id=?', item.post_id); }
   };
-  scheduleTimer = setInterval(() => { void publishDue().catch((error) => logger.error(`scheduled publish failed: ${message(error)}`)); }, 30000);
-  scheduleTimer.unref?.();
-  hooks.on('post:beforeRender', (payload) => ({ ...payload, html: modernHtml(payload.post) }), { priority: 5 });
-  router.register('get', '/admin/posts/new', editPermission, canEdit, (_req, res) => res.render('admin/post-edit', { title: '新建文章', post: null, schedule: null, modernEditor: true }));
-  router.register('get', '/admin/posts/:id/edit', editPermission, canEdit, async (req, res) => {
-    const post = await posts().findById(Number(param(req.params.id)));
+  context.effect(() => {
+    const timer = setInterval(() => { void publishDue().catch((error) => context.logger.error(`scheduled publish failed: ${message(error)}`)); }, 30000);
+    timer.unref?.();
+    return () => clearInterval(timer);
+  });
+  context.linearpress.hooks.on('post:beforeRender', (payload) => ({ ...payload, html: modernHtml(payload.post) }), { priority: 5 });
+  web.register('get', '/admin/posts/new', editPermission, canEdit, (_req, res) => res.render('admin/post-edit', { title: '新建文章', post: null, schedule: null, modernEditor: true }));
+  web.register('get', '/admin/posts/:id/edit', editPermission, canEdit, async (req, res) => {
+    const post = await posts.findById(Number(param(req.params.id)));
     if (!post) return void res.status(404).render('error', { title: '文章不存在', message: '找不到这篇文章。' });
-    const schedule = await database().get<{ publish_at: string }>('SELECT publish_at FROM modern_editor_schedule WHERE post_id=?', post.id);
+    const schedule = await db.get<{ publish_at: string }>('SELECT publish_at FROM modern_editor_schedule WHERE post_id=?', post.id);
     res.render('admin/post-edit', { title: '编辑文章', post, schedule, modernEditor: true });
   });
-  router.register('post', '/admin/posts/save', editPermission, canEdit, async (req, res) => {
+  web.register('post', '/admin/posts/save', editPermission, canEdit, async (req, res) => {
     try {
       const raw = JSON.parse(String(req.body.content_json ?? '[]')) as Array<Record<string, unknown>>;
       const blocks = raw.map((block) => ({ type: 'custom-html', content: marker(block) })) as Block[];
       const scheduled = String(req.body.schedule_enabled ?? '') === 'on' && String(req.body.publish_at ?? '').trim();
-      const saved = await posts().save({ id: Number(req.body.id) || undefined, title: String(req.body.title ?? ''), slug: String(req.body.slug ?? ''), blocks, status: scheduled ? 'draft' : String(req.body.status ?? 'draft') as PostStatus, authorId: req.session.userId! });
-      if (scheduled) await database().run('INSERT INTO modern_editor_schedule(post_id,publish_at) VALUES(?,?) ON CONFLICT(post_id) DO UPDATE SET publish_at=excluded.publish_at', saved.id, String(req.body.publish_at));
-      else await database().run('DELETE FROM modern_editor_schedule WHERE post_id=?', saved.id);
+      const saved = await posts.save({ id: Number(req.body.id) || undefined, title: String(req.body.title ?? ''), slug: String(req.body.slug ?? ''), blocks, status: scheduled ? 'draft' : String(req.body.status ?? 'draft') as PostStatus, authorId: req.session.userId! });
+      if (scheduled) await db.run('INSERT INTO modern_editor_schedule(post_id,publish_at) VALUES(?,?) ON CONFLICT(post_id) DO UPDATE SET publish_at=excluded.publish_at', saved.id, String(req.body.publish_at));
+      else await db.run('DELETE FROM modern_editor_schedule WHERE post_id=?', saved.id);
       res.redirect(`/admin/posts/${saved.id}/edit?saved=1`);
     } catch (error) { res.status(400).render('error', { title: '文章保存失败', message: message(error) }); }
   });
-  logger.info('activated');
-};
-export const deactivate: PluginEntry['deactivate'] = async () => { if (scheduleTimer) clearInterval(scheduleTimer); scheduleTimer = undefined; };
+  context.logger.info('activated');
+}
 export { MARKER, readMarker, renderModernContent };
