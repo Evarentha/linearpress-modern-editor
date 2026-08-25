@@ -32,4 +32,4 @@
     <select name="status" data-status hidden><option value="draft" <%= post?.status === 'draft' || !post ? 'selected' : '' %>>草稿</option><option value="published" <%= post?.status === 'published' ? 'selected' : '' %>>发布</option><option value="archived" <%= post?.status === 'archived' ? 'selected' : '' %>>归档</option></select>
   </form>
 </div>
-<script>window.MODERN_EDITOR_INITIAL = <%- JSON.stringify(post?.content_json ?? []) %>;</script>
+<script>window.MODERN_EDITOR_INITIAL = <%- JSON.stringify(post?.content_json ?? []).replace(/</g, '\\u003c') %>;</script>

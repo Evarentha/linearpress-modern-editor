@@ -1,3 +1,6 @@
+/* 沉浸式编辑页隐藏后台右栏，避免顶栏/画布与详情面板重叠 */
+.admin-columns:has(.modern-editor-page) .admin-right{display:none}
+.admin-columns:has(.modern-editor-page){grid-template-columns:1fr}
 /*
  * Author: MoyuZJ
  * Team: LinearTeam

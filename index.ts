@@ -17,8 +17,8 @@ const editPermission: RequestHandler = requireAuth;
 const canEdit: RequestHandler = checkPermission('post:edit');
 
 function param(value: string | string[]): string { return Array.isArray(value) ? value[0] ?? '' : value; }
-function message(error: unknown): string { return error instanceof Error ? error.message : '操作失败'; }
-function escape(value: unknown): string { return String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c]!)); }
+const messageOf = (error: unknown): string => error instanceof Error ? error.message : '操作失败';
+const esc = (value: unknown): string => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c]!));
 function marker(block: Record<string, unknown>): string { return `${MARKER}${Buffer.from(JSON.stringify(block), 'utf8').toString('base64')}`; }
 function readMarker(value: unknown): Record<string, unknown> | undefined {
   const raw = String(value ?? '');
@@ -56,8 +56,16 @@ function rich(value: unknown): string {
       return allowedStyles.has(property.trim().toLowerCase()) && /^[#\w (),.%+-]+$/.test(valuePart);
     }).join(';');
     const outputTag = upper === 'FONT' ? 'span' : tag.toLowerCase();
-    return style ? `<${outputTag} style="${escape(style)}">` : `<${outputTag}>`;
+    return style ? `<${outputTag} style="${esc(style)}">` : `<${outputTag}>`;
   });
+}
+/** 链接地址协议白名单：http/https 及站内地址；其余降级为 '#'。 */
+function safeHref(value: unknown): string {
+  const raw = String(value ?? '').trim();
+  if (!raw || raw === '#') return '#';
+  if (/^https?:\/\//i.test(raw)) return esc(raw);
+  if (/^\/[^^]/.test(raw) || raw.startsWith('./')) return esc(raw);
+  return '#';
 }
 function blockText(block: Record<string, unknown>): string { return rich(block.contentHtml ?? block.content); }
 function renderStored(block: Record<string, unknown>): string {
@@ -88,10 +96,10 @@ function renderModern(block: Record<string, unknown>): string | undefined {
     const rows = cells ? cells.map((row, rowIndex) => `<tr>${row.map((cell) => `<${rowIndex === 0 ? 'th' : 'td'}>${rich(cell)}</${rowIndex === 0 ? 'th' : 'td'}>`).join('')}</tr>`).join('') : String(block.rows ?? '').split('\n').filter(Boolean).map((row) => `<tr>${row.split('|').map((cell) => `<td>${safeText(cell.trim())}</td>`).join('')}</tr>`).join('');
     return `<table><tbody>${rows}</tbody></table>`;
   }
-  if (type === 'audio') return `<audio controls src="${escape(block.src)}"></audio>`;
-  if (type === 'video') return `<video controls src="${escape(block.src)}"></video>`;
-  if (type === 'icon') return `<span class="lp-modern-icon" aria-label="${escape(block.label)}">${safeText(block.icon || '✦')}</span>`;
-  if (type === 'button') return `<p class="lp-modern-buttons">${(Array.isArray(block.buttonsHtml) ? block.buttonsHtml : String(block.buttons ?? '按钮').split('\n')).map((item) => `<a href="${escape(block.href || '#')}">${rich(item)}</a>`).join('')}</p>`;
+  if (type === 'audio') return `<audio controls src="${esc(block.src)}"></audio>`;
+  if (type === 'video') return `<video controls src="${esc(block.src)}"></video>`;
+  if (type === 'icon') return `<span class="lp-modern-icon" aria-label="${esc(block.label)}">${safeText(block.icon || '✦')}</span>`;
+  if (type === 'button') return `<p class="lp-modern-buttons">${(Array.isArray(block.buttonsHtml) ? block.buttonsHtml : String(block.buttons ?? '按钮').split('\n')).map((item) => `<a href="${safeHref(block.href)}">${rich(item)}</a>`).join('')}</p>`;
   if (type === 'columns') {
     const columns = Array.isArray(block.columns) ? block.columns.slice(0, 3) : [
       { type: 'paragraph', contentHtml: block.leftHtml ?? block.left ?? '' },
@@ -100,7 +108,7 @@ function renderModern(block: Record<string, unknown>): string | undefined {
     return `<div class="lp-modern-columns lp-modern-columns-${Math.max(1, columns.length)}">${columns.map((child) => `<div class="lp-modern-column">${renderStored((child || { type: 'paragraph' }) as Record<string, unknown>)}</div>`).join('')}</div>`;
   }
   if (type === 'spacer') return `<div class="lp-modern-spacer" style="height:${Math.max(8, Math.min(400, Number(block.size) || 48))}px"></div>`;
-  if (type === 'image') return `<figure><img src="${escape(block.src)}" alt="${escape(block.alt)}"></figure>`;
+  if (type === 'image') return `<figure><img src="${esc(block.src)}" alt="${esc(block.alt)}"></figure>`;
   return undefined;
 }
 function renderModernContent(blocks: Block[]): string { return blocks.map((block) => renderStored(block as unknown as Record<string, unknown>)).join('\n'); }
@@ -117,7 +125,7 @@ export default async function modernEditor(context: Context) {
     for (const item of due) if (Date.parse(item.publish_at) <= Date.now()) { await db.run("UPDATE posts SET status='published', updated_at=CURRENT_TIMESTAMP WHERE id=?", item.post_id); await db.run('DELETE FROM modern_editor_schedule WHERE post_id=?', item.post_id); }
   };
   context.effect(() => {
-    const timer = setInterval(() => { void publishDue().catch((error) => context.logger.error(`scheduled publish failed: ${message(error)}`)); }, 30000);
+    const timer = setInterval(() => { void publishDue().catch((error) => context.logger.error(`scheduled publish failed: ${messageOf(error)}`)); }, 30000);
     timer.unref?.();
     return () => clearInterval(timer);
   });
@@ -138,7 +146,7 @@ export default async function modernEditor(context: Context) {
       if (scheduled) await db.run('INSERT INTO modern_editor_schedule(post_id,publish_at) VALUES(?,?) ON CONFLICT(post_id) DO UPDATE SET publish_at=excluded.publish_at', saved.id, String(req.body.publish_at));
       else await db.run('DELETE FROM modern_editor_schedule WHERE post_id=?', saved.id);
       res.redirect(`/admin/posts/${saved.id}/edit?saved=1`);
-    } catch (error) { res.status(400).render('error', { title: '文章保存失败', message: message(error) }); }
+    } catch (error) { res.status(400).render('error', { title: '文章保存失败', message: messageOf(error) }); }
   });
   context.logger.info('activated');
 }
