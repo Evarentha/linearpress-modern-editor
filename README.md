@@ -37,7 +37,7 @@ LinearPress 的 **WordPress 风格可视化编辑器**：无边界区块编辑�
 cd base && sh scripts/sync-plugins.sh modern-editor
 
 # Option 2 — clone into runtime dir（目录名必须等于插件 id）
-git clone https://github.com/Averithen/linearpress-modern-editor src/plugins/modern-editor
+git clone https://github.com/Evarentha/linearpress-modern-editor src/plugins/modern-editor
 ```
 
 After enabling and restarting，`/admin/posts/new` & `/admin/posts/:id/edit` switch to the modern editor; disabling returns to the basic editor.
@@ -45,7 +45,7 @@ After enabling and restarting，`/admin/posts/new` & `/admin/posts/:id/edit` swi
 ## Local Development / 本地开发：怎么拉 / 怎么改 / 怎么跑
 
 ```bash
-git clone https://github.com/Averithen/linearpress-modern-editor LinearPress/Plugins/modern-editor
+git clone https://github.com/Evarentha/linearpress-modern-editor LinearPress/Plugins/modern-editor
 cd LinearPress/base
 npm install && npm run db:init
 sh scripts/sync-plugins.sh modern-editor
