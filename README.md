@@ -5,60 +5,65 @@
   Made by MoyuZJ in China with ♥
 -->
 
-# Modern Editor（modern-editor）
+# Modern Editor / 现代可视化编辑器
 
-LinearPress 的 **WordPress 风格可视化编辑器**：无边界区块编辑、浮动格式栏、发布二次确认与定时发布，
-直接替换文章编辑页的输入体验。
+A **WordPress-style visual editor** for LinearPress: borderless block editing, floating format bar, publish double-confirmation and scheduled publishing (reserved) — replaces the article editing experience entirely.
 
-> 本仓库是 LinearPress 插件 **modern-editor** 的独立开发仓库。插件即 Cordis 插件函数，即插即用、可停用可卸载。
+LinearPress 的 **WordPress 风格可视化编辑器**：无边界区块编辑、浮动格式栏、发布二次确认与定时发布（预留），直接替换文章编辑页的输入体验。
 
-## 插件化的优势
+> Independent plugin repository for LinearPress **modern-editor**. A plugin is a Cordis plugin function — install on demand, disable/uninstall cleanly.
+> 本仓库是 LinearPress 插件 **modern-editor** 的独立仓库。
 
-- **不替换 `ctx.posts`**：编辑器只是「视图」，保存仍走核心文章服务与 Hook——`post:beforeSave` / `post:beforeRender` / 编辑器端 `window.LinearPressEditor` 扩展全部可用，其它插件不受影响。
-- **标记可回退**：区块以 `LP-MODERN-BLOCK::<base64(JSON)>` 纯文本标记存为 `custom-html`；插件停用后文章仍以普通文本输出，不会依赖主题支持私有标签。
-- **协调共存**：评论区、媒体库、说说、高级文章列表等插件均可与它协作（如媒体库注入按钮、高级文章列表注入分类二次确认面板）。
+## Why Plugins? / 插件化的优势
 
-## 功能
+- **Never replaces `ctx.posts`** —— the editor is a "view"; saving still goes through core post service & hooks, so `post:beforeSave` / `post:beforeRender` and the editor API remain fully extensible.
+  **不替换 `ctx.posts`**——编辑器只是「视图」，保存仍走核心服务与 Hook，其它插件扩展不受影响。
+- **Reversible markers** —— blocks are stored as `LP-MODERN-BLOCK::<base64(JSON)>` text markers in `custom-html`; after disabling the plugin, articles still output plain text — no private-tag dependency.
+  **标记可回退**——区块以纯文本标记保存；插件停用后文章仍以普通文本输出。
+- **Plays well with others** —— media library buttons, advanced-posts-list category panel, comments etc. all cooperate through public hooks.
+  **协调共存**——媒体库、分类二次确认、评论区等插件均可协作。
 
-- **直接编辑**：在文章画布上直接编辑 `contenteditable` 文档，无需字段与预览切换；选中文本弹出浮动格式栏（文字颜色、背景色、粗体、斜体、下划线、波浪线、删除线）。
-- **区块丰富**：段落、标题、列表、引用、代码、详细信息、数学、预格式文本、引文、表格、诗、折叠内容、音频、视频、图标、按钮、栏目（最多三列、可递归嵌套）与分隔。
-- **草稿与发布**：保存草稿并写浏览器本地副本（30 秒节流）；发布先开侧边检查栏二次确认；`publish_at` 预留定时发布能力。
-- **Markdown 兼容**：编辑时不粘贴 HTML 也能获得所见即所得排版（README 之外的用法以代码为准）。
+## Features / 功能
 
-## 安装
+- **Direct editing / 直接编辑**：edit the `contenteditable` document on the canvas; floating format bar（color, bg, bold, italic, underline, wavy underline, strikethrough）.
+- **Rich blocks / 区块丰富**：paragraph, heading, list, quote, code, details, math, preformatted, citation, table, poem, collapsed content, audio, video, icon, buttons, columns（up to 3, recursively nested）, divider.
+- **Draft & publish / 草稿与发布**：draft autosave to browser local copy（30s throttle）；publish shows a sidebar re-confirm；`publish_at` reserved for scheduled publishing.
+- **Safe rendering / 安全渲染**：post-processed through whitelist on `post:beforeRender`; no private HTML tags leak into themes.
+
+## Install / 安装
 
 ```bash
-# 方式一：工作区同步
+# Option 1 — workspace sync（工作区同步）
 cd base && sh scripts/sync-plugins.sh modern-editor
 
-# 方式二：克隆到运行目录（目录名必须等于插件 id）
-git clone <本仓库地址> src/plugins/modern-editor
+# Option 2 — clone into runtime dir（目录名必须等于插件 id）
+git clone https://github.com/Averithen/linearpress-modern-editor src/plugins/modern-editor
 ```
 
-插件启用并重启后，`/admin/posts/new` 与 `/admin/posts/:id/edit` 自动切换为现代编辑器；停用即回到基础编辑器。
+After enabling and restarting，`/admin/posts/new` & `/admin/posts/:id/edit` switch to the modern editor; disabling returns to the basic editor.
 
-## 本地开发：怎么拉 / 怎么改 / 怎么跑
+## Local Development / 本地开发：怎么拉 / 怎么改 / 怎么跑
 
 ```bash
-git clone <本仓库地址> LinearPress/Plugins/modern-editor
+git clone https://github.com/Averithen/linearpress-modern-editor LinearPress/Plugins/modern-editor
 cd LinearPress/base
 npm install && npm run db:init
 sh scripts/sync-plugins.sh modern-editor
-npm run dev                # http://localhost:3000 —— 登录后台 → 文章 → 新建/编辑
+npm run dev                # → http://localhost:3000 — admin → Posts → New/Edit
 ```
 
-## 目录结构
+## Directory / 目录结构
 
 ```text
 modern-editor/
 ├── plugin.json            # Manifest
-├── index.ts               # 入口：编辑页视图覆盖、区块标记编解码、渲染器、定时发布 Effect
-├── views/admin/post-edit.ejs   # 覆盖文章编辑页
-└── public/                # 编辑器 CSS（含 overrides）与 JS
+├── index.ts               # entry：editor view override, block marker codec, renderer, scheduling effect
+├── views/admin/post-edit.ejs   # overrides the post edit page
+└── public/                # editor CSS（+ overrides）and JS
 ```
 
-## 贡献与发布
+## Contribute & Release / 贡献与发布
 
-- conventional commits；提交前 `cd base && npm run typecheck`
-- 版本：`git tag v1.0.0 && git push --tags`
-- License：MIT（见仓库 LICENSE）
+- conventional commits；`cd base && npm run typecheck` before commit
+- Version：`git tag v1.0.0 && git push --tags`
+- License：MIT（LICENSE）
