@@ -1,29 +1,64 @@
-# Modern Editor
+<!--
+  Author: MoyuZJ
+  Team: LinearTeam
+  Contact: linearteam@foxmail.com
+  Made by MoyuZJ in China with ♥
+-->
 
-LinearPress 的 WordPress 风格可视化编辑器插件。
+# Modern Editor（modern-editor）
 
-LinearPress 当前通过 Cordis Fiber 管理插件生命周期，同时由 Express 提供路由和 EJS。编辑器的 `activate`、`deactivate` 仍兼容旧 API；定时发布计时器使用 `context.cordis.effect()` 自动清理。
+LinearPress 的 **WordPress 风格可视化编辑器**：无边界区块编辑、浮动格式栏、发布二次确认与定时发布，
+直接替换文章编辑页的输入体验。
 
+> 本仓库是 LinearPress 插件 **modern-editor** 的独立开发仓库。插件即 Cordis 插件函数，即插即用、可停用可卸载。
 
-将本目录复制到 LinearPress 的 `src/plugins/modern-editor`，或在后台使用 ZIP 安装。插件启用后重启进程，管理后台的 `/admin/posts/new` 和 `/admin/posts/:id/edit` 会切换为现代编辑器。
+## 插件化的优势
 
-编辑区是直接在文章画布上编辑的 `contenteditable` 文档，不需要先填写字段再看预览。选中文本后会显示浮动格式栏，可设置文字颜色、背景颜色、粗体、斜体、下划线、波浪下划线和删除线。
+- **不替换 `ctx.posts`**：编辑器只是「视图」，保存仍走核心文章服务与 Hook——`post:beforeSave` / `post:beforeRender` / 编辑器端 `window.LinearPressEditor` 扩展全部可用，其它插件不受影响。
+- **标记可回退**：区块以 `LP-MODERN-BLOCK::<base64(JSON)>` 纯文本标记存为 `custom-html`；插件停用后文章仍以普通文本输出，不会依赖主题支持私有标签。
+- **协调共存**：评论区、媒体库、说说、高级文章列表等插件均可与它协作（如媒体库注入按钮、高级文章列表注入分类二次确认面板）。
 
-表格使用 `cells` 保存，栏目使用 `columns` 保存子区块（最多三列，每一列都是一个区块，因此栏目可以递归嵌套），文本样式使用受限的 `contentHtml` 保存；阅读页会通过安全白名单恢复这些样式。
-编辑器提交时会把每个区块包装为：
+## 功能
 
-```text
-LP-MODERN-BLOCK::<base64(JSON)>
+- **直接编辑**：在文章画布上直接编辑 `contenteditable` 文档，无需字段与预览切换；选中文本弹出浮动格式栏（文字颜色、背景色、粗体、斜体、下划线、波浪线、删除线）。
+- **区块丰富**：段落、标题、列表、引用、代码、详细信息、数学、预格式文本、引文、表格、诗、折叠内容、音频、视频、图标、按钮、栏目（最多三列、可递归嵌套）与分隔。
+- **草稿与发布**：保存草稿并写浏览器本地副本（30 秒节流）；发布先开侧边检查栏二次确认；`publish_at` 预留定时发布能力。
+- **Markdown 兼容**：编辑时不粘贴 HTML 也能获得所见即所得排版（README 之外的用法以代码为准）。
+
+## 安装
+
+```bash
+# 方式一：工作区同步
+cd base && sh scripts/sync-plugins.sh modern-editor
+
+# 方式二：克隆到运行目录（目录名必须等于插件 id）
+git clone <本仓库地址> src/plugins/modern-editor
 ```
 
-并以 `custom-html` 区块保存。它不是 HTML，而是可读的纯文本标记。现代编辑器启用时，`post:beforeRender` 会识别标记并渲染为对应样式；插件移除后，LinearPress 仍会把标记作为普通文本输出，不会依赖主题支持私有 HTML 标签。
+插件启用并重启后，`/admin/posts/new` 与 `/admin/posts/:id/edit` 自动切换为现代编辑器；停用即回到基础编辑器。
 
-## 区块
+## 本地开发：怎么拉 / 怎么改 / 怎么跑
 
-段落、标题、列表、引用、代码、详细信息、数学、预格式文本、引文、表格、诗、折叠内容、音频、视频、图标、单个或多个按钮、栏目和空间隔。栏目参考 WordPress `InnerBlocks` 模型，区块类型不会常驻显示在正文画布中。
+```bash
+git clone <本仓库地址> LinearPress/Plugins/modern-editor
+cd LinearPress/base
+npm install && npm run db:init
+sh scripts/sync-plugins.sh modern-editor
+npm run dev                # http://localhost:3000 —— 登录后台 → 文章 → 新建/编辑
+```
 
-区块最终仍通过 LinearPress 的 Hook 和服务/区块注册体系参与渲染。其他插件可以继续使用 `post:beforeSave`、`post:beforeRender` 或编辑器端的 `window.LinearPressEditor` 扩展能力；现代编辑器不会替换 `ctx.posts`。
+## 目录结构
 
-## 草稿与发布
+```text
+modern-editor/
+├── plugin.json            # Manifest
+├── index.ts               # 入口：编辑页视图覆盖、区块标记编解码、渲染器、定时发布 Effect
+├── views/admin/post-edit.ejs   # 覆盖文章编辑页
+└── public/                # 编辑器 CSS（含 overrides）与 JS
+```
 
-保存按钮保存草稿并写入浏览器本地草稿；每 30 秒仅在有改动时更新本地副本。发布按钮先打开侧边检查栏，二次确认后提交为 `published`。云端草稿冲突提示依赖服务端返回的文章时间戳，当前版本保留本地草稿恢复提示；`publish_at` 字段已预留，定时发布需要站点的后台任务或发布服务继续接入。
+## 贡献与发布
+
+- conventional commits；提交前 `cd base && npm run typecheck`
+- 版本：`git tag v1.0.0 && git push --tags`
+- License：MIT（见仓库 LICENSE）
