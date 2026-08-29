@@ -1,7 +1,26 @@
 {
-  "name": "linearpress-modern-editor",
-  "private": true,
+  "name": "@evarentha/linearpress-modern-editor",
+  "version": "1.4.0",
+  "private": false,
+  "description": "WordPress 风格的无边界区块编辑器与发布流程",
   "type": "module",
-  "dependencies": { "express": "^5.1.0" },
-  "devDependencies": { "@types/express": "^5.0.3", "typescript": "^5.8.3" }
+  "main": "index.ts",
+  "files": [
+    "index.ts",
+    "plugin.json",
+    "src",
+    "views",
+    "public",
+    "README.md",
+    "LICENSE"
+  ],
+  "license": "MIT",
+  "keywords": [
+    "linearpress",
+    "plugin",
+    "modern-editor"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }
