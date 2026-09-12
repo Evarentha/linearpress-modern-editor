@@ -1,64 +1,54 @@
-<!--
-  Author: MoyuZJ
-  Team: LinearTeam
-  Contact: linearteam@foxmail.com
-  Made by MoyuZJ in China with ♥
--->
+# Modern Editor
 
-# Modern Editor（modern-editor）
+[![LinearPress](https://img.shields.io/badge/LinearPress-plugin-7C3AED.svg)](https://www.npmjs.com/package/@evarentha/linearpress) [![npm](https://img.shields.io/npm/v/@evarentha/linearpress-modern-editor.svg)](https://www.npmjs.com/package/@evarentha/linearpress-modern-editor) [![Node.js](https://img.shields.io/badge/node-%3E%3D22-green.svg)](https://nodejs.org) [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue.svg)](https://www.typescriptlang.org) [![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue.svg)](LICENSE)
 
-LinearPress 的 **WordPress 风格可视化编辑器**：无边界区块编辑、浮动格式栏、发布二次确认与定时发布，
-直接替换文章编辑页的输入体验。
+**English** | [简体中文](README.zh-CN.md)
 
-> 本仓库是 LinearPress 插件 **modern-editor** 的独立开发仓库。插件即 Cordis 插件函数，即插即用、可停用可卸载。
+A visual block editor that takes over post editing in LinearPress. You edit directly on the canvas, format from a floating bar, drafts survive crashes and stray tabs, and publishing can happen now or on a schedule. The plugin is its own switch: enabled, it replaces the base editor screens; disabled, the base editor returns and existing posts stay readable.
 
-## 插件化的优势
+Writers need `post:create` for new posts and `post:edit` for existing ones, granted per group in the admin console.
 
-- **不替换 `ctx.posts`**：编辑器只是「视图」，保存仍走核心文章服务与 Hook——`post:beforeSave` / `post:beforeRender` / 编辑器端 `window.LinearPressEditor` 扩展全部可用，其它插件不受影响。
-- **标记可回退**：区块以 `LP-MODERN-BLOCK::<base64(JSON)>` 纯文本标记存为 `custom-html`；插件停用后文章仍以普通文本输出，不会依赖主题支持私有标签。
-- **协调共存**：评论区、媒体库、说说、高级文章列表等插件均可与它协作（如媒体库注入按钮、高级文章列表注入分类二次确认面板）。
-
-## 功能
-
-- **直接编辑**：在文章画布上直接编辑 `contenteditable` 文档，无需字段与预览切换；选中文本弹出浮动格式栏（文字颜色、背景色、粗体、斜体、下划线、波浪线、删除线）。
-- **区块丰富**：段落、标题、列表、引用、代码、详细信息、数学、预格式文本、引文、表格、诗、折叠内容、音频、视频、图标、按钮、栏目（最多三列、可递归嵌套）与分隔。
-- **草稿与发布**：保存草稿并写浏览器本地副本（30 秒节流）；发布先开侧边检查栏二次确认；`publish_at` 预留定时发布能力。
-- **Markdown 兼容**：编辑时不粘贴 HTML 也能获得所见即所得排版（README 之外的用法以代码为准）。
-
-## 安装
+## Install
 
 ```bash
-# 方式一：工作区同步
-cd base && sh scripts/sync-plugins.sh modern-editor
-
-# 方式二：克隆到运行目录（目录名必须等于插件 id）
-git clone <本仓库地址> src/plugins/modern-editor
+git clone https://github.com/Evarentha/linearpress-modern-editor.git src/plugins/modern-editor
 ```
 
-插件启用并重启后，`/admin/posts/new` 与 `/admin/posts/:id/edit` 自动切换为现代编辑器；停用即回到基础编辑器。
+The directory name must equal the plugin id. Restart afterwards, or sync from the `base` checkout (`sh scripts/sync-plugins.sh modern-editor`), or upload the ZIP / npm name from the admin Plugins page. There is no settings page; everything is chosen on the canvas.
 
-## 本地开发：怎么拉 / 怎么改 / 怎么跑
+## Editing
 
-```bash
-git clone <本仓库地址> LinearPress/Plugins/modern-editor
-cd LinearPress/base
-npm install && npm run db:init
-sh scripts/sync-plugins.sh modern-editor
-npm run dev                # http://localhost:3000 —— 登录后台 → 文章 → 新建/编辑
+21 block types: paragraph, heading (H1 to H4), ordered or unordered lists, quote (with a legacy `blockquote` alias for older content), code with a language field, math, preformatted text, citation, poem, table, details, collapse, audio, video, icon, buttons with links, columns, spacer, image, and custom-html. The legacy `blockquote` alias and the separate `details` and `collapse` types are what bring the count to 21.
+
+Tables have directly editable cells with add/delete controls for rows and columns. Columns hold one to three nested blocks, recursively, and each column carries a type switcher that asks before clearing its content. Selecting text brings up the floating bar: bold, italic, underline, wavy underline, strikethrough, relative font size up and down, text color, background color, with legacy `<font>` tags normalized to styled spans.
+
+Unknown or custom block types, the ones other plugins register, render as an editable JSON textarea so the data is never invisible.
+
+## Drafts and schedules
+
+Draft safety is layered. The editor autosaves a local copy to localStorage every 30 seconds. Returning to the post offers a restore prompt that compares the local copy against the server's `updated_at` before touching anything. A crash-safe snapshot is written right before submit, and an unsaved new post carries over as a pending draft instead of evaporating.
+
+The publish drawer accepts an optional schedule. A server-side effect checks every 30 seconds and flips due drafts to published; pending schedules sit in the `modern_editor_schedule` table (`post_id`, `publish_at`) until they fire.
+
+## Storage and integration
+
+Blocks persist in `posts.content_json`, with editor-native blocks stored as `LP-MODERN-BLOCK::<base64>` URI markers inside `custom-html` blocks. While the plugin is active, its `post:beforeRender` hook decodes and re-renders the markers server-side through an allowlist sanitizer, so themes receive clean HTML whatever the editor produced; no theme ever has to understand the markers. If the plugin is disabled, previously saved posts show the raw marker text until they are re-saved, so keep it enabled or re-save the affected posts before removing it.
+
+Saving goes through `ctx.posts.save`, so every base hook, including `post:beforeSave`, still fires for other plugins. The routes it takes over, `GET /admin/posts/new`, `GET /admin/posts/:id/edit`, and `POST /admin/posts/save`, are overridden only while the plugin is enabled, so post-related plugins keep working alongside it.
+
+Other plugins can extend the editor through `window.LinearPressModernEditor = { registerBlock, getBlocks, setBlocks }`: register new block types, read the document, or rewrite it. media-library uses exactly this to append media blocks from its picker. A custom block takes a label, an optional description, and the default data for new blocks:
+
+```js
+// any plugin's browser script
+window.LinearPressModernEditor.registerBlock('callout', {
+  label: 'Callout',
+  description: 'Highlighted note',
+  defaults: { contentHtml: 'Write the note here' }
+});
 ```
 
-## 目录结构
+The block then appears on the toolbar; an unknown type saved by another plugin renders as the editable JSON textarea described above, so data is never lost. How a custom type renders on the public site is up to the registering plugin: the base `registerBlock()` server-side block registry is the documented hook for that.
 
-```text
-modern-editor/
-├── plugin.json            # Manifest
-├── index.ts               # 入口：编辑页视图覆盖、区块标记编解码、渲染器、定时发布 Effect
-├── views/admin/post-edit.ejs   # 覆盖文章编辑页
-└── public/                # 编辑器 CSS（含 overrides）与 JS
-```
+## License
 
-## 贡献与发布
-
-- conventional commits；提交前 `cd base && npm run typecheck`
-- 版本：`git tag v1.0.0 && git push --tags`
-- License：MIT（见仓库 LICENSE）
+GPL-3.0-or-later, Copyright (C) 2026 Evarentha. See LICENSE.
