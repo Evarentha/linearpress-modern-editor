@@ -1,8 +1,24 @@
 /*
- * Author: MoyuZJ
- * Team: LinearTeam
- * Contact: linearteam@foxmail.com
- * Made by MoyuZJ in China with ♥
+ * Modern Editor Frontend Runtime
+ *
+ * Browser runtime of the block-based modern editor, from block toolbar to
+ * publish drawer.
+ *
+ * Authors:
+ * MoyuZJ <moyuzj@moyuzj.cn> @LinearTeam - Made in China with ♥
+ *
+ * Copyright (C) 2026 Evarentha
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+/**
+ * Activates on pages carrying [data-modern-editor]: normalizes the initial
+ * blocks, renders each block as an editable body (rich text, lists, tables,
+ * columns, media, unknown blocks as editable JSON), shows a floating inline
+ * format bar, and serializes the document into the hidden content_json field
+ * on save. Keeps a recoverable local draft and exposes the
+ * window.LinearPressModernEditor extension API.
+ * @since 1.4.0
  */
 
 (() => {
@@ -139,10 +155,10 @@
       table.addEventListener('input', () => { block.cells = Array.from(table.rows).map((row) => Array.from(row.cells).map((cell) => cell.innerHTML)); markDirty(); });
       body.append(table);
       const controls = document.createElement('div'); controls.className = 'modern-table-controls';
-      controls.append(tableAction('添加行', () => { const width = Math.max(1, ...block.cells.map((row) => row.length)); block.cells.push(Array.from({ length: width }, () => '')); render(); markDirty(); }), tableAction('添加列', () => { if (!block.cells.length) block.cells.push(['']); block.cells.forEach((row) => row.push('')); render(); markDirty(); })); body.append(controls);
+      controls.append(tableAction('添加行', () => { const width = Math.max(1, ...block.cells.map((row) => row.length)); block.cells.push(Array.from({ length: width }, () => '')); render(); markDirty(); }), tableAction('添加列', () => { if (!block.cells.length) block.cells.push(['']); block.cells.forEach((row) => row.push('')); render(); markDirty(); }), tableAction('删行', () => { if (block.cells.length > 1) { block.cells.pop(); render(); markDirty(); } }), tableAction('删列', () => { if (Math.max(1, ...block.cells.map((row) => row.length)) > 1) { block.cells.forEach((row) => row.pop()); render(); markDirty(); } })); body.append(controls);
     } else if (block.type === 'columns') {
       const columns = ensureColumns(block); const wrap = document.createElement('div'); wrap.className = 'modern-edit-columns'; wrap.style.setProperty('--column-count', String(columns.length));
-      columns.forEach((child, index) => { const column = document.createElement('section'); column.className = 'modern-column'; const picker = select('', child.type, order.map((type) => [type, definitions[type][0]]), (value) => { columns[index] = create(value); render(); markDirty(); }); picker.classList.add('modern-column-switcher'); column.append(picker, makeBody(child, true)); wrap.append(column); });
+      columns.forEach((child, index) => { const column = document.createElement('section'); column.className = 'modern-column'; const picker = select('', child.type, order.map((type) => [type, definitions[type][0]]), (value) => { if (value !== child.type && !confirm('切换栏目类型将清空该栏现有内容，确定吗？')) { picker.querySelector('select').value = child.type; return; } columns[index] = create(value); render(); markDirty(); }); picker.classList.add('modern-column-switcher'); column.append(picker, makeBody(child, true)); wrap.append(column); });
       const controls = document.createElement('div'); controls.className = 'modern-columns-controls'; controls.append(tableAction(columns.length < 3 ? '添加列' : '最多三列', () => { if (columns.length < 3) { columns.push(create('paragraph')); render(); markDirty(); } }), tableAction(columns.length > 1 ? '删除末列' : '至少一列', () => { if (columns.length > 1) { columns.pop(); render(); markDirty(); } })); body.append(wrap, controls);
     } else if (block.type === 'details' || block.type === 'collapse') {
       body.append(editable('div', block.summaryHtml || '', 'modern-summary-edit', (el) => { block.summaryHtml = el.innerHTML; }), editable('div', contentFor(block), 'modern-rich-content', (el) => { block.contentHtml = el.innerHTML; }), check('默认展开', block, 'open'));
@@ -155,10 +171,33 @@
     } else if (block.type === 'icon') {
       body.append(editable('span', escapeHtml(block.icon || '✦'), 'modern-icon-edit', (el) => { block.icon = el.textContent || '✦'; }), field('无障碍标签', block.label, (value) => { block.label = value; }));
     } else if (block.type === 'image' || block.type === 'audio' || block.type === 'video') {
-      body.append(field('地址', block.src, (value) => { block.src = value; render(); }), field('说明', block.alt, (value) => { block.alt = value; }));
-      if (block.src) { const media = document.createElement(block.type === 'image' ? 'img' : block.type); media.src = block.src; if (block.type === 'image') media.alt = block.alt || ''; media.controls = block.type !== 'image'; media.className = 'modern-media-edit'; body.append(media); }
+      let mediaEl = null;
+      const ensureMedia = () => { if (!mediaEl) { mediaEl = document.createElement(block.type === 'image' ? 'img' : block.type); mediaEl.className = 'modern-media-edit'; if (block.type !== 'image') mediaEl.controls = true; body.append(mediaEl); } return mediaEl; };
+      body.append(field('地址', block.src, (value) => {
+        block.src = value;
+        // 就地更新预览：整页 render() 会重建 DOM，导致地址输入框每个按键失焦。
+        const media = ensureMedia(); media.src = value; if (block.type === 'image') media.alt = block.alt || '';
+      }), field('说明', block.alt, (value) => { block.alt = value; if (block.type === 'image' && mediaEl) mediaEl.alt = value; }));
+      if (block.src) { const media = ensureMedia(); media.src = block.src; if (block.type === 'image') media.alt = block.alt || ''; }
     } else if (block.type === 'custom-html') {
       body.append(editable('div', block.content || '', 'modern-custom-html-edit', (el) => { block.content = el.innerHTML; }));
+    } else {
+      // 未知 / 插件注册的区块类型：以 JSON 文本呈现并可直接编辑，保证内容可见且不丢失。
+      const unknown = document.createElement('textarea');
+      unknown.className = 'modern-unknown-edit';
+      unknown.spellcheck = false;
+      unknown.value = JSON.stringify(block, null, 2);
+      unknown.addEventListener('input', () => {
+        try {
+          const parsed = JSON.parse(unknown.value);
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            Object.keys(block).forEach((key) => delete block[key]);
+            Object.assign(block, parsed);
+            markDirty();
+          }
+        } catch { /* JSON 未写完时暂不应用 */ }
+      });
+      body.append(unknown);
     }
     if (block.type === 'heading') body.append(select('层级', block.level || 2, [['1', 'H1'], ['2', 'H2'], ['3', 'H3'], ['4', 'H4']], (value) => { block.level = Number(value); render(); }));
     if (block.type === 'list') body.append(select('样式', block.ordered ? 'true' : 'false', [['false', '无序'], ['true', '有序']], (value) => { block.ordered = value === 'true'; render(); }));
@@ -266,6 +305,7 @@
   formatBar.querySelectorAll('[data-color]').forEach((input) => input.addEventListener('input', () => applyFormat(input.dataset.color, input.value)));
 
   function submit(nextStatus) {
+    if (!title.value.trim()) { title.focus(); alert('请填写文章标题。'); return; }
     sync(); status.value = nextStatus; dirty = false;
     localStorage.setItem(storageKey, JSON.stringify({ at: Date.now(), fingerprint: fingerprint(), title: title.value, blocks }));
     if (isNew) { try { sessionStorage.setItem(pendingNewKey, storageKey); } catch {} }

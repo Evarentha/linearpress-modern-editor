@@ -1,8 +1,24 @@
 /*
- * Author: MoyuZJ
- * Team: LinearTeam
- * Contact: linearteam@foxmail.com
- * Made by MoyuZJ in China with ♥
+ * Modern Editor Plugin
+ *
+ * Block-based visual editor for LinearPress posts: server-side block
+ * sanitizing and rendering, immersive admin editing, and scheduled
+ * publishing.
+ *
+ * Authors:
+ * MoyuZJ <moyuzj@moyuzj.cn> @LinearTeam - Made in China with ♥
+ *
+ * Copyright (C) 2026 Evarentha
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+/**
+ * Sanitizes block content through a whitelist of inline tags and CSS
+ * properties, renders blocks (including marker-encoded custom-HTML blocks)
+ * to post HTML, and replaces the admin post edit pages with the immersive
+ * editor view. Saves posts as marker blocks and keeps a
+ * modern_editor_schedule table, publishing due posts on a 30-second timer.
+ * @since 1.4.0
  */
 
 import type { RequestHandler } from 'express';

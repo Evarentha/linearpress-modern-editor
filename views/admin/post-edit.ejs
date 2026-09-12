@@ -1,11 +1,24 @@
-<%
-/*
- * Author: MoyuZJ
- * Team: LinearTeam
- * Contact: linearteam@foxmail.com
- * Made by MoyuZJ in China with ♥
- */
-%>
+<!--
+  Immersive Post Editing Page View
+
+  Admin EJS view that renders the immersive modern-editor writing page for
+  creating and editing posts.
+
+  Authors:
+  MoyuZJ <moyuzj@moyuzj.cn> @LinearTeam - Made in China with ♥
+
+  Copyright (C) 2026 Evarentha
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
+<!--
+  Renders the editor shell consumed by modern-editor.js: save/publish top
+  bar, title and slug row, block toolbar, block document canvas, and a
+  publish drawer with optional scheduled publishing. The form posts to
+  /admin/posts/save with a hidden content_json field bootstrapped from
+  window.MODERN_EDITOR_INITIAL.
+  @since 1.4.0
+-->
 
 <div class="modern-editor-page" data-modern-editor data-cloud-saved-at="<%= post?.updated_at ? Date.parse(post.updated_at) : 0 %>">
   <form id="modern-editor-form" method="post" action="/admin/posts/save">
