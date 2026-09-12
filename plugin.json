@@ -1,15 +1,23 @@
 {
   "id": "modern-editor",
   "name": "现代可视化编辑器",
-  "version": "1.4.0",
+  "version": "3.0.0",
   "description": "WordPress 风格的无边界区块编辑器与发布流程",
   "author": "LinearPress",
   "type": "both",
   "main": "index.ts",
   "runtime": "cordis",
-  "permissions": ["post:create", "post:edit"],
+  "permissions": [
+    "post:create",
+    "post:edit"
+  ],
   "views": "views",
   "public": "public",
-  "styles": ["modern-editor.css?v=1.3.0", "modern-editor-overrides.css?v=1.3.0"],
-  "scripts": ["modern-editor.js?v=1.3.0"]
+  "styles": [
+    "modern-editor.css?v=1.3.0",
+    "modern-editor-overrides.css?v=1.3.0"
+  ],
+  "scripts": [
+    "modern-editor.js?v=1.3.0"
+  ]
 }
