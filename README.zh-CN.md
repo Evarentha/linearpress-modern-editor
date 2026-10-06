@@ -28,11 +28,11 @@ git clone https://github.com/Evarentha/linearpress-modern-editor.git src/plugins
 
 草稿保障分为多层：每 30 秒向 localStorage 保存一份本地副本；回到文章时，恢复提示先以本地副本与服务器的 `updated_at` 比对，确认更新方才应用；提交前一刻写入一份防崩溃快照；未保存的新文章作为待定草稿保留，不会丢失。
 
-发布抽屉接受可选的定时计划。服务端每 30 秒检查一次，将到达发布时间的草稿转为已发布；待发布的排期存储于 `modern_editor_schedule` 表（`post_id`、`publish_at`），直至触发。
+发布抽屉将浏览器本地时间转换为明确的 UTC ISO。服务端在任何写入之前拒绝无效、无时区或已过去的排期。每 30 秒通过条件更新领取到期草稿，并在同一事务内经文章服务及 Hook 发布。保存、撤回、归档、删除均取消旧排期；明确选择新排期才重新调度。
 
 ## 存储与集成
 
-块存储于 `posts.content_json`，编辑器原生块以 `LP-MODERN-BLOCK::<base64>` URI 标记封装于 custom-html 块中。插件启用期间，`post:beforeRender` Hook 在服务端解码并以白名单净化器重新渲染这些标记，主题获得的始终是净化后的 HTML，不会接触到标记本身。若停用插件，已保存的文章将显示原始标记文本，直至重新保存；因此请保持插件启用，或在移除前重新保存受影响的文章。
+块存储于 `posts.content_json` 的便携 `custom-html` 块：`content` 为已渲染 HTML，`modernBlock` 保留原始编辑数据。因此核心直接生成正常 `html_cache`，停用或卸载插件后文章仍可阅读，重新启用也不会丢失块编辑能力。启用时会升级历史 `LP-MODERN-BLOCK::<base64>` 块及缓存；兼容核心在插件缺席时也可安全降级显示历史标记。
 
 保存经由 `ctx.posts.save` 执行，包括 `post:beforeSave` 在内的全部基础 Hook 照常触发，其他插件不受影响。本插件接管的 `GET /admin/posts/new`、`GET /admin/posts/:id/edit`、`POST /admin/posts/save` 仅在启用期间生效，围绕文章的其他插件可与之并存。
 

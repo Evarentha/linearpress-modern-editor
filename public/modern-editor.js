@@ -1,11 +1,11 @@
 /*
  * Modern Editor Frontend Runtime
  *
- * Browser runtime of the block-based modern editor, from block toolbar to
- * publish drawer.
+ * Browser runtime of the block-based modern editor, from block toolbar to publish drawer.
  *
  * Authors:
  * MoyuZJ <moyuzj@moyuzj.cn> @LinearTeam - Made in China with ♥
+ * worryzu <worryzu@gmail.com> @LinearTeam
  *
  * Copyright (C) 2026 Evarentha
  * SPDX-License-Identifier: GPL-3.0-or-later
@@ -90,7 +90,7 @@
     } catch { return block; }
   }
   function normalizeBlock(value) {
-    let block = markerBlock(value);
+    let block = markerBlock(value?.modernBlock || value);
     if (block.type === 'custom-html' && String(block.content ?? '').startsWith('LP-MODERN-BLOCK::')) block = markerBlock(block);
     if (block.type === 'custom-html') return block;
     if (block.type === 'blockquote') block.type = 'quote';
@@ -306,6 +306,10 @@
 
   function submit(nextStatus) {
     if (!title.value.trim()) { title.focus(); alert('请填写文章标题。'); return; }
+    if (nextStatus === 'published' && scheduled.checked) {
+      try { scheduleUTC.value = localScheduleToUTC(scheduleTime.value); }
+      catch { scheduleTime.focus(); alert('请选择有效的未来发布时间。'); return; }
+    } else { scheduled.checked = false; scheduleUTC.value = ''; }
     sync(); status.value = nextStatus; dirty = false;
     localStorage.setItem(storageKey, JSON.stringify({ at: Date.now(), fingerprint: fingerprint(), title: title.value, blocks }));
     if (isNew) { try { sessionStorage.setItem(pendingNewKey, storageKey); } catch {} }
@@ -316,7 +320,20 @@
   function openDrawer() { page.querySelector('[data-summary-title]').textContent = title.value || '未命名文章'; const labels = { draft: '草稿', published: '已发布', archived: '已归档' }; page.querySelector('[data-summary-status]').textContent = labels[status.value] || status.value; drawer.classList.add('is-open'); backdrop.classList.add('is-open'); }
   function closeDrawer() { drawer.classList.remove('is-open'); backdrop.classList.remove('is-open'); }
   page.querySelector('[data-open-publish]').addEventListener('click', openDrawer); page.querySelectorAll('[data-close-publish]').forEach((el) => el.addEventListener('click', closeDrawer)); page.querySelector('[data-confirm-publish]').addEventListener('click', () => submit('published'));
-  const scheduled = page.querySelector('[data-schedule-enabled]'); const scheduleTime = page.querySelector('[data-schedule-time]'); scheduled.addEventListener('change', () => { scheduleTime.disabled = !scheduled.checked; });
+  const scheduled = page.querySelector('[data-schedule-enabled]'); const scheduleTime = page.querySelector('[data-schedule-time]'); const scheduleUTC = page.querySelector('[data-schedule-utc]');
+  function localScheduleToUTC(value) {
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) throw new Error('Invalid local time');
+    const date = new Date(value);
+    const [year, month, day, hour, minute] = value.match(/\d+/g).map(Number);
+    // Reject calendar overflow and nonexistent local times (DST gap).
+    if (!Number.isFinite(date.getTime()) || date.getFullYear() !== year || date.getMonth() + 1 !== month || date.getDate() !== day || date.getHours() !== hour || date.getMinutes() !== minute || date.getTime() <= Date.now()) throw new Error('Invalid local time');
+    return date.toISOString();
+  }
+  if (scheduleTime.dataset.publishAt) {
+    const date = new Date(scheduleTime.dataset.publishAt);
+    if (Number.isFinite(date.getTime())) scheduleTime.value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}T${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  }
+  scheduled.addEventListener('change', () => { scheduleTime.disabled = !scheduled.checked; });
 
   const params = new URLSearchParams(window.location.search);
   if (!isNew && params.get('saved') === '1') {

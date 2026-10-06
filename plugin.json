@@ -14,10 +14,10 @@
   "views": "views",
   "public": "public",
   "styles": [
-    "modern-editor.css?v=1.3.0",
-    "modern-editor-overrides.css?v=1.3.0"
+    "modern-editor.css?v=dff7bd03bc14",
+    "modern-editor-overrides.css?v=ad9db6d5285e"
   ],
   "scripts": [
-    "modern-editor.js?v=1.3.0"
+    "modern-editor.js?v=083133e24a95"
   ]
 }

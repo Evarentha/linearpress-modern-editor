@@ -28,11 +28,11 @@ Unknown or custom block types, the ones other plugins register, render as an edi
 
 Draft safety is layered. The editor autosaves a local copy to localStorage every 30 seconds. Returning to the post offers a restore prompt that compares the local copy against the server's `updated_at` before touching anything. A crash-safe snapshot is written right before submit, and an unsaved new post carries over as a pending draft instead of evaporating.
 
-The publish drawer accepts an optional schedule. A server-side effect checks every 30 seconds and flips due drafts to published; pending schedules sit in the `modern_editor_schedule` table (`post_id`, `publish_at`) until they fire.
+The publish drawer converts the selected local time to explicit UTC ISO before submission. Invalid, timezone-free and past times are rejected before changing a post. Every 30 seconds the server conditionally claims due drafts and publishes through the post service/hooks in a transaction. Saving, withdrawing, archiving or deleting a post cancels its old schedule; an explicit new schedule replaces it.
 
 ## Storage and integration
 
-Blocks persist in `posts.content_json`, with editor-native blocks stored as `LP-MODERN-BLOCK::<base64>` URI markers inside `custom-html` blocks. While the plugin is active, its `post:beforeRender` hook decodes and re-renders the markers server-side through an allowlist sanitizer, so themes receive clean HTML whatever the editor produced; no theme ever has to understand the markers. If the plugin is disabled, previously saved posts show the raw marker text until they are re-saved, so keep it enabled or re-save the affected posts before removing it.
+Blocks persist in `posts.content_json` as portable `custom-html` blocks: `content` contains rendered HTML, while `modernBlock` retains the original editor data. The core renderer therefore writes real HTML to `html_cache`, and disabling or removing this plugin leaves posts readable without losing editor data. Activation upgrades legacy `LP-MODERN-BLOCK::<base64>` blocks and caches; the compatible core also safely renders legacy markers when the plugin is absent.
 
 Saving goes through `ctx.posts.save`, so every base hook, including `post:beforeSave`, still fires for other plugins. The routes it takes over, `GET /admin/posts/new`, `GET /admin/posts/:id/edit`, and `POST /admin/posts/save`, are overridden only while the plugin is enabled, so post-related plugins keep working alongside it.
 
